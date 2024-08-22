@@ -131,7 +131,7 @@ services:
       - COMPOSER_HOME=/var/www/html
 
   db:
-    image: mysql:5.7
+    image: mysql:8.0
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       MYSQL_DATABASE: ${MYSQL_DATABASE}
@@ -145,7 +145,7 @@ services:
       - donotstart
 
   gearman:
-    image: gearman
+    image: dockage/gearmand
     ports:
       - "4730:4730"
     profiles:
