@@ -103,7 +103,7 @@ default_socket_timeout = 60
 [CLI Server]
 cli_server.color = On
 [Date]
-date.timezone=America/Phoenix
+date.timezone=${TIMEZONE}
 [filter]
 [iconv]
 [intl]
@@ -444,6 +444,20 @@ while true; do
     fi
 done
 
+# Interactive configuration for timezone
+echo "Select timezone (default America/New_York):"
+select timezone in America/New_York America/Los_Angeles America/Chicago America/Denver America/Phoenix America/Anchorage America/Juneau America/Detroit America/Indiana/Indianapolis America/Indiana/Marengo America/Indiana/Knox America/Indiana/Vevay America/Indiana/Tell_City America/Indiana/Petersburg America/Indiana/Vincennes America/Indiana/Winamac America/Indiana/Marengo America/Kentucky/Monticello America/Kentucky/Louisville America/North_Dakota/Center America/North_Dakota/New_Salem America/North_Dakota/Beulah America/North_Dakota/Center America/North_Dakota/New_Salem America/North_Dakota/Beulah; do
+    case $timezone in
+        America/New_York|America/Los_Angeles|America/Chicago|America/Denver|America/Phoenix|America/Anchorage|America/Juneau|America/Detroit|America/Indiana/Indianapolis|America/Indiana/Marengo|America/Indiana/Knox|America/Indiana/Vevay|America/Indiana/Tell_City|America/Indiana/Petersburg|America/Indiana/Vincennes|America/Indiana/Winamac|America/Kentucky/Monticello|America/Kentucky/Louisville|America/North_Dakota/Center|America/North_Dakota/New_Salem|America/North_Dakota/Beulah)
+            export TIMEZONE=$timezone
+            break
+            ;;
+        *)
+            echo "Invalid option. Please select a valid timezone."
+            ;;
+    esac
+done
+
 # Write credentials to a file
 cat <<EOF > .env
 PHP_VERSION=${PHP_VERSION}
@@ -454,6 +468,7 @@ MYSQL_USER=${MYSQL_USER}
 MYSQL_PASSWORD=${MYSQL_PASSWORD}
 WEB_PORT=${WEB_PORT}
 MYSQL_PORT=${MYSQL_PORT}
+TIMEZONE=${TIMEZONE}
 EOF
 
 # Create configuration files
