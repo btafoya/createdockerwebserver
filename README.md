@@ -2,6 +2,8 @@
 
 This repository contains a script to set up a Dockerized web server on a Debian based host, with PHP and MySQL, including configuration for Apache, PHP extensions, and Supervisor.
 
+<a href="https://www.buymeacoffee.com/luckyedward"><img src="https://img.buymeacoffee.com/button-api/?text=Buy me Drink&emoji=🍹&slug=luckyedward&button_colour=5F7FFF&font_colour=ffffff&font_family=Bree&outline_colour=000000&coffee_colour=FFDD00" style="float: right;" /></a>
+
 ## Features
 
 - **Dockerized Environment**: Run your web server in a containerized environment.
