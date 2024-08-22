@@ -77,6 +77,20 @@ install_docker() {
     sudo apt install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
 }
 
+# Function to check if Git is installed
+check_git() {
+    if ! [ -x "$(command -v git)" ]; then
+        echo "Git is not installed. Installing Git..."
+        install_git
+    fi
+}
+
+# Function to install Git
+install_git() {
+    sudo apt update
+    sudo apt install -y git
+}
+
 # Function to clone the git repository
 clone_repo() {
     if [ -d "$WEBROOT_DIR/$WEB_ROOT" ]; then
@@ -550,6 +564,7 @@ done
 
 # Main script execution
 check_docker
+check_git
 mkdir -p "${WEBROOT_DIR}"
 mkdir -p "${MYSQLDATA_DIR}"
 mkdir -p "${LOGS_DIR}"
