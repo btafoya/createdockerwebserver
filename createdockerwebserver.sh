@@ -24,20 +24,20 @@ show_help() {
 Usage: $0 [options]
 
 Options:
-  -p, --port            Web server port (default: 8080)
-  -v, --php-version     PHP version (default: 7.4)
-  -g, --git-repo        Git repository URL (default: https://github.com/your-repo/your-project.git)
-  -d, --project-dir     Project directory (default: /var/www/html)
-  -r, --web-root        Web root directory (default: public)
-  -e, --php-extensions  PHP extensions (default: apc bcmath intl cli fpm curl imap imagick gd mysql zip xml soap ssh2 gearman redis apcu mbstring mongodb mailparse tidy gmp sqlite3 mcrypt dev xdebug pgsql opcache gearman maxmind2)
-  -m, --mysql-root-pw   MySQL root password (default: generated)
-  -b, --mysql-db        MySQL database name (default: example_db)
-  -u, --mysql-user      MySQL user (default: example_user)
-  -w, --mysql-pw        MySQL user password (default: generated)
-  -h, --help            Show this help message
-  -i, --interactive     Interactive setup
-  -c, --git-command     Git command to execute (e.g., git pull)
-  -u, --update-php      Update PHP version on an already deployed stack
+  -p, --port=            Web server port (default: 8080)
+  -v, --php-version=     PHP version (default: 7.4)
+  -g, --git-repo=        Git repository URL (default: https://github.com/your-repo/your-project.git)
+  -d, --project-dir=     Project directory (default: /var/www/html)
+  -r, --web-root=        Web root directory (default: public)
+  -e, --php-extensions=  PHP extensions (default: apc bcmath intl cli fpm curl imap imagick gd mysql zip xml soap ssh2 gearman redis apcu mbstring mongodb mailparse tidy gmp sqlite3 mcrypt dev xdebug pgsql opcache gearman maxmind2)
+  -m, --mysql-root-pw=   MySQL root password (default: generated)
+  -b, --mysql-db=        MySQL database name (default: example_db)
+  -u, --mysql-user=      MySQL user (default: example_user)
+  -w, --mysql-pw=        MySQL user password (default: generated)
+  -h, --help             Show this help message
+  -i, --interactive      Interactive setup
+  -c, --git-command=     Git command to execute (e.g., git pull)
+  -u, --update-php       Update PHP version on an already deployed stack
 
 Examples:
   $0 -p 8080 -v 7.4 -g https://github.com/your-repo/your-project.git -d /var/www/html -r public -m example_root_password -b example_db -u example_user -w example_pass
@@ -112,6 +112,7 @@ execute_git_command() {
 # Function to create Docker Compose file
 create_docker_compose() {
     cat <<EOF > docker-compose.yml
+version: '3'
 services:
   web:
     build:
@@ -319,6 +320,7 @@ default_socket_timeout = 60
 [CLI Server]
 cli_server.color = On
 [Date]
+date.timezone=America/Phoenix
 [filter]
 [iconv]
 [intl]
@@ -542,19 +544,19 @@ EOF
 # Parse command-line arguments
 while [[ "$#" -gt 0 ]]; do
     case $1 in
-        -p|--port) WEB_SERVER_PORT="$2"; shift ;;
-        -v|--php-version) PHP_VERSION="$2"; shift ;;
-        -g|--git-repo) GIT_REPO_URL="$2"; shift ;;
-        -d|--project-dir) PROJECT_DIR="$2"; shift ;;
-        -r|--web-root) WEB_ROOT="$2"; shift ;;
-        -e|--php-extensions) PHP_EXTENSIONS="$2"; shift ;;
-        -m|--mysql-root-pw) MYSQL_ROOT_PASSWORD="$2"; shift ;;
-        -b|--mysql-db) MYSQL_DATABASE="$2"; shift ;;
-        -u|--mysql-user) MYSQL_USER="$2"; shift ;;
-        -w|--mysql-pw) MYSQL_PASSWORD="$2"; shift ;;
+        -p|--port=*) WEB_SERVER_PORT="${1#*=}"; shift ;;
+        -v|--php-version=*) PHP_VERSION="${1#*=}"; shift ;;
+        -g|--git-repo=*) GIT_REPO_URL="${1#*=}"; shift ;;
+        -d|--project-dir=*) PROJECT_DIR="${1#*=}"; shift ;;
+        -r|--web-root=*) WEB_ROOT="${1#*=}"; shift ;;
+        -e|--php-extensions=*) PHP_EXTENSIONS="${1#*=}"; shift ;;
+        -m|--mysql-root-pw=*) MYSQL_ROOT_PASSWORD="${1#*=}"; shift ;;
+        -b|--mysql-db=*) MYSQL_DATABASE="${1#*=}"; shift ;;
+        -u|--mysql-user=*) MYSQL_USER="${1#*=}"; shift ;;
+        -w|--mysql-pw=*) MYSQL_PASSWORD="${1#*=}"; shift ;;
         -h|--help) show_help; exit 0 ;;
         -i|--interactive) interactive_setup; shift ;;
-        -c|--git-command) GIT_COMMAND="$2"; shift ;;
+        -c|--git-command=*) GIT_COMMAND="${1#*=}"; shift ;;
         -u|--update-php) update_php_version; shift ;;
         *) echo "Unknown parameter passed: $1"; show_help; exit 1 ;;
     esac
