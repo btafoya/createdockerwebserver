@@ -1,6 +1,6 @@
 # Create Docker Web Server
 
-This repository contains a script to set up a Dockerized web server on a Debian based host, with PHP and MySQL, including configuration for Apache, PHP extensions, and Supervisor.
+This repository contains a script to set up a web application environment on a Ubuntu based, with Apache, PHP, MySQL, PHP (5.6 7.1 7.2 7.3 7.4 8.0 8.1 8.2 8.3), PHP extensions, Redis, Gearman Job Server, and Supervisor.
 
 <a href="https://www.buymeacoffee.com/luckyedward"><img src="https://img.buymeacoffee.com/button-api/?text=Buy me Drink&emoji=🍹&slug=luckyedward&button_colour=5F7FFF&font_colour=ffffff&font_family=Bree&outline_colour=000000&coffee_colour=FFDD00" style="float: right;" /></a>
 
@@ -11,7 +11,6 @@ This repository contains a script to set up a Dockerized web server on a Debian 
 - **MySQL Database**: Set up a MySQL database with customizable credentials.
 - **Supervisor**: Manage background processes with Supervisor.
 - **Interactive Setup**: Optionally configure the setup interactively.
-- **Git Integration**: Clone a Git repository into the web root.
 
 ## Prerequisites
 
@@ -19,67 +18,67 @@ This repository contains a script to set up a Dockerized web server on a Debian 
 - Docker & Docker Compose
 - Git
 
+This script sets up a Dockerized web application environment with Apache, PHP, MySQL, and Supervisor.
+
+## Features
+
+- Interactive configuration for PHP version, MySQL credentials, and ports.
+- Stores MySQL data outside of the Docker image.
+- Generates Dockerfile and docker-compose.yml.
+- Builds and runs the Docker container.
+
+## Prerequisites
+
+- Docker
+- Docker Compose
+
 ## Usage
 
-### Command-Line Options
+1. Make the script executable:
 
-```bash
-Usage: createdockerwebserver.sh [options]
+    ```bash
+    chmod +x createdockerwebserver.sh
+    ```
 
-Options:
-  -p, --port=            Web server port (default: 8080)
-  -v, --php-version=     PHP version (default: 7.4)
-  -g, --git-repo=        Git repository URL (default: https://github.com/your-repo/your-project.git)
-  -d, --project-dir=     Project directory (default: /var/www/html)
-  -r, --web-root=        Web root directory (default: public)
-  -e, --php-extensions=  PHP extensions (default: apc bcmath intl cli fpm curl imap imagick gd mysql zip xml soap ssh2 gearman redis apcu mbstring mongodb mailparse tidy gmp sqlite3 mcrypt dev xdebug pgsql opcache gearman maxmind2)
-  -m, --mysql-root-pw=   MySQL root password (default: generated)
-  -b, --mysql-db=        MySQL database name (default: example_db)
-  -u, --mysql-user=      MySQL user (default: example_user)
-  -w, --mysql-pw=        MySQL user password (default: generated)
-  -h, --help             Show this help message
-  -i, --interactive      Interactive setup
-  -c, --git-command=     Git command to execute (e.g., git pull)
-  -u, --update-php       Update PHP version on an already deployed stack
+2. Run the script:
 
-Examples:
-  createdockerwebserver.sh -p 8080 -v 7.4 -g https://github.com/your-repo/your-project.git -d /var/www/html -r public -m example_root_password -b example_db -u example_user -w example_pass
-  createdockerwebserver.sh -i
-  createdockerwebserver.sh -c "git pull"
-  createdockerwebserver.sh -u 8.0
-```
-### Interactive Setup (recommended)
-If you prefer an interactive setup, you can use the `-i` or `--interactive` option. This will prompt you to enter the necessary configuration values interactively.
+    ```bash
+    ./createdockerwebserver.sh
+    ```
 
-```bash
-./createdockerwebserver.sh -i
-```
+3. Follow the interactive prompts to configure PHP version, MySQL credentials, and ports.
 
-### Update PHP Version
+## Configuration
 
-To update the PHP version on an already deployed stack, use the `-u` or `--update-php` flag.
-
-```bash
-./createdockerwebserver.sh -u 8.0
-```
+- **PHP Version**: Select from the list of available versions.
+- **MySQL Credentials**: Enter root password, database name, user, and user password.
+- **Ports**: Enter web port (default 80) and MySQL port (default 3306).
 
 ## Directory Structure
 
-- **configs**: Directory for configuration files.
-- **webroot**: Directory for the web root.
-- **mysqldata**: Directory for MySQL data.
-- **logs**: Directory for logs.
+- `config`: Directory for configuration files.
+- `web_root`: Directory for web application files.
+- `mysql_data`: Directory for MySQL data.
 
-## Files Created
+## Files
 
-- **docker-compose.yml**: Docker Compose file for setting up the services.
-- **Dockerfile**: Dockerfile for the PHP and Apache service.
-- **Dockerfile.supervisor**: Dockerfile for the Supervisor service.
-- **configs/supervisord.conf**: Supervisor configuration file.
-- **configs/apache2/000-default.conf**: Apache configuration file.
-- **configs/php.ini**: PHP configuration file.
-- **configs/my.cnf**: MySQL configuration file.
-- **credentials.txt**: File containing the credentials and configuration used.
+- `Dockerfile`: Dockerfile for building the Docker image.
+- `docker-compose.yml`: Docker Compose file for running the Docker container.
+- `credentials.env`: File containing the configuration values.
+
+## Commands
+
+- **Build the Docker image**:
+
+    ```bash
+    docker compose build
+    ```
+
+- **Run the Docker container**:
+
+    ```bash
+    docker compose up -d
+    ```
 
 ## Contributing
 
