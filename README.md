@@ -1,6 +1,6 @@
 # Create Docker Web Server
 
-This repository contains a script to set up a Dockerized web server with PHP and MySQL, including configuration for Apache, PHP extensions, and Supervisor. This script is designed to run on Debian based distros.
+This repository contains a script to set up a Dockerized web server with PHP and MySQL, including configuration for Apache, PHP extensions, and Supervisor.
 
 ## Features
 
@@ -13,7 +13,8 @@ This repository contains a script to set up a Dockerized web server with PHP and
 
 ## Prerequisites
 
-- Docker
+- Debian based Distro as Docker Host
+- Docker & Docker Compose
 - Git
 
 ## Usage
@@ -44,53 +45,3 @@ Examples:
   createdockerwebserver.sh -i
   createdockerwebserver.sh -c "git pull"
   createdockerwebserver.sh -u 8.0
-```
-
-### Interactive Setup
-
-Run the script with the `-i` or `--interactive` flag to set up the environment interactively.
-
-```bash
-chmod a+x createdockerwebserver.sh
-./createdockerwebserver.sh -i
-```
-
-### Update PHP Version
-
-To update the PHP version on an already deployed stack, use the `-u` or `--update-php` flag.
-
-```bash
-./createdockerwebserver.sh -u 8.0
-```
-
-## Directory Structure
-
-- **configs**: Directory for configuration files.
-- **webroot**: Directory for the web root.
-- **mysqldata**: Directory for MySQL data.
-- **logs**: Directory for logs.
-
-## Files Created
-
-- **docker-compose.yml**: Docker Compose file for setting up the services.
-- **Dockerfile**: Dockerfile for the PHP and Apache service.
-- **Dockerfile.supervisor**: Dockerfile for the Supervisor service.
-- **configs/supervisord.conf**: Supervisor configuration file.
-- **configs/apache2/000-default.conf**: Apache configuration file.
-- **configs/php.ini**: PHP configuration file.
-- **configs/my.cnf**: MySQL configuration file.
-- **credentials.txt**: File containing the credentials and configuration used.
-
-## Contributing
-
-Feel free to open issues or pull requests if you have any suggestions or improvements.
-
-## License
-
-This project is licensed under the MIT License.
-
-## Contact
-
-Brian Tafoya - btafoya@briantafoya.com
-
-Project Link: [https://github.com/btafoya/createdockerwebserver](https://github.com/btafoya/createdockerwebserver)
