@@ -1,235 +1,13 @@
 #!/bin/bash
 
-# Configuration variables
-WEB_SERVER_PORT=${1:-8080}
-PHP_VERSION=${2:-7.4}
-GIT_REPO_URL=${3:-"https://github.com/your-repo/your-project.git"}
-PROJECT_DIR=${4:-"/var/www/html"}
-WEB_ROOT=${5:-"public"}
-PHP_EXTENSIONS=${6:-"apc bcmath intl cli fpm curl imap imagick gd mysql zip xml soap ssh2 gearman redis apcu mbstring mongodb mailparse tidy gmp sqlite3 mcrypt dev xdebug pgsql opcache gearman maxmind2"}
-MYSQL_ROOT_PASSWORD=${7:-$(openssl rand -base64 12)}
-MYSQL_DATABASE=${8:-"example_db"}
-MYSQL_USER=${9:-"example_user"}
-MYSQL_PASSWORD=${10:-$(openssl rand -base64 12)}
+# Configuration directory
+CONFIG_DIR="config"
+WEB_ROOT="web_root"
+MYSQL_DATA="mysql_data"
 
-# Directories
-CONFIG_DIR="configs"
-WEBROOT_DIR="webroot"
-MYSQLDATA_DIR="mysqldata"
-LOGS_DIR="logs"
-
-# Function to display help
-show_help() {
-    cat <<EOF
-Usage: $0 [options]
-
-Options:
-  -p, --port=            Web server port (default: 8080)
-  -v, --php-version=     PHP version (default: 7.4)
-  -g, --git-repo=        Git repository URL (default: https://github.com/your-repo/your-project.git)
-  -d, --project-dir=     Project directory (default: /var/www/html)
-  -r, --web-root=        Web root directory (default: public)
-  -e, --php-extensions=  PHP extensions (default: apc bcmath intl cli fpm curl imap imagick gd mysql zip xml soap ssh2 gearman redis apcu mbstring mongodb mailparse tidy gmp sqlite3 mcrypt dev xdebug pgsql opcache gearman maxmind2)
-  -m, --mysql-root-pw=   MySQL root password (default: generated)
-  -b, --mysql-db=        MySQL database name (default: example_db)
-  -u, --mysql-user=      MySQL user (default: example_user)
-  -w, --mysql-pw=        MySQL user password (default: generated)
-  -h, --help             Show this help message
-  -i, --interactive      Interactive setup
-  -c, --git-command=     Git command to execute (e.g., git pull)
-  -u, --update-php       Update PHP version on an already deployed stack
-
-Examples:
-  $0 -p 8080 -v 7.4 -g https://github.com/your-repo/your-project.git -d /var/www/html -r public -m example_root_password -b example_db -u example_user -w example_pass
-  $0 -i
-  $0 -c "git pull"
-  $0 -u 8.0
-EOF
-}
-
-# Function to check if Docker is installed
-check_docker() {
-    if ! [ -x "$(command -v docker)" ]; then
-        echo "Docker is not installed. Installing Docker..."
-        install_docker
-    fi
-}
-
-# Function to install Docker
-install_docker() {
-    # Update system and install required packages to handle HTTPS over APT
-    sudo apt update
-    sudo apt install -y apt-transport-https ca-certificates curl software-properties-common
-
-    # Remove any older versions of Docker that might be installed
-    sudo apt remove -y docker docker-engine docker.io containerd runc
-
-    # Add Docker’s official GPG key to ensure integrity of the packages
-    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
-
-    # Add Docker's stable repository for Ubuntu based on the system architecture
-    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-
-    # Update apt packages list with the new Docker repository included
-    sudo apt update
-
-    # Install Docker Community Edition, CLI, and containerd.io along with Docker Compose Plugin
-    sudo apt install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
-}
-
-# Function to check if Git is installed
-check_git() {
-    if ! [ -x "$(command -v git)" ]; then
-        echo "Git is not installed. Installing Git..."
-        install_git
-    fi
-}
-
-# Function to install Git
-install_git() {
-    sudo apt update
-    sudo apt install -y git
-}
-
-# Function to clone the git repository
-clone_repo() {
-    if [ -d "$WEBROOT_DIR/$WEB_ROOT" ]; then
-        echo "Web root directory already exists. Skipping clone."
-    else
-        git clone "$GIT_REPO_URL" "$WEBROOT_DIR/$WEB_ROOT"
-    fi
-}
-
-# Function to execute a git command
-execute_git_command() {
-    if [ -n "$GIT_COMMAND" ]; then
-        cd "$WEBROOT_DIR/$WEB_ROOT"
-        eval "$GIT_COMMAND"
-        cd -
-    fi
-}
-
-# Function to create Docker Compose file
-create_docker_compose() {
-    cat <<EOF > docker-compose.yml
-services:
-  web:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    ports:
-      - "${WEB_SERVER_PORT}:80"
-    volumes:
-      - ./${WEBROOT_DIR}:/var/www/html
-      - ./${CONFIG_DIR}/apache2:/etc/apache2
-      - ./${CONFIG_DIR}/php.ini:/usr/local/etc/php/php.ini
-      - ./${LOGS_DIR}/apache2:/var/log/apache2
-    depends_on:
-      - db
-      - gearman
-    environment:
-      - COMPOSER_HOME=/var/www/html
-
-  db:
-    image: mysql:8.0
-    environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-      MYSQL_DATABASE: ${MYSQL_DATABASE}
-      MYSQL_USER: ${MYSQL_USER}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
-    volumes:
-      - ./${MYSQLDATA_DIR}:/var/lib/mysql
-      - ./${CONFIG_DIR}/my.cnf:/etc/mysql/my.cnf
-      - ./${LOGS_DIR}/mysql:/var/log/mysql
-    profiles:
-      - donotstart
-
-  gearman:
-    image: dockage/gearmand
-    ports:
-      - "4730:4730"
-    profiles:
-      - donotstart
-
-  composer:
-    image: composer:latest
-    volumes:
-      - ./${WEBROOT_DIR}:/app
-    working_dir: /app
-    command: composer install
-
-  supervisor:
-    build:
-      context: .
-      dockerfile: Dockerfile.supervisor
-    volumes:
-      - ./${WEBROOT_DIR}:/var/www/html
-      - ./${CONFIG_DIR}/supervisord.conf:/etc/supervisor/conf.d/supervisord.conf
-      - ./${LOGS_DIR}/supervisor:/var/log/supervisor
-    depends_on:
-      - gearman
-    profiles:
-      - donotstart
-
-volumes:
-  db_data:
-EOF
-}
-
-# Function to create Dockerfile for PHP with extensions
-create_dockerfile() {
-    cat <<EOF > Dockerfile
-FROM php:${PHP_VERSION}-apache
-RUN apt-get update && apt-get install -y \
-    libcurl4-openssl-dev \
-    pkg-config \
-    libssl-dev \
-    libicu-dev \
-    libonig-dev \
-    libzip-dev \
-    libjpeg-dev \
-    libpng-dev \
-    libfreetype6-dev \
-    libmcrypt-dev \
-    libpq-dev \
-    libgearman-dev \
-    libmemcached-dev \
-    libssh2-1-dev \
-    libsqlite3-dev \
-    libgmp-dev \
-    libtidy-dev \
-    libmagickwand-dev \
-    libmongoc-dev \
-    libmaxminddb-dev \
-    && docker-php-ext-install ${PHP_EXTENSIONS} \
-    && pecl install gearman \
-    && docker-php-ext-enable gearman \
-    && pecl install redis \
-    && docker-php-ext-enable redis \
-    && pecl install apcu \
-    && docker-php-ext-enable apcu \
-    && pecl install mongodb \
-    && docker-php-ext-enable mongodb \
-    && pecl install mailparse \
-    && docker-php-ext-enable mailparse \
-    && pecl install maxminddb \
-    && docker-php-ext-enable maxminddb \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
-
-# Set the web root
-RUN sed -i "s|/var/www/html|/var/www/html/${WEB_ROOT}|g" /etc/apache2/sites-available/000-default.conf
-EOF
-}
-
-# Function to create Dockerfile for Supervisor
-create_supervisor_dockerfile() {
-    cat <<EOF > Dockerfile.supervisor
-FROM php:${PHP_VERSION}-cli
-RUN apt-get update && apt-get install -y supervisor
-CMD ["supervisord", "-n"]
-EOF
-}
+# Default ports
+WEB_PORT=80
+MYSQL_PORT=3306
 
 # Function to create Supervisor configuration file
 create_supervisor_conf() {
@@ -251,7 +29,7 @@ EOF
 create_apache_config_dir() {
     mkdir -p "${CONFIG_DIR}/apache2"
     cat <<EOF > ${CONFIG_DIR}/apache2/000-default.conf
-<VirtualHost *:80>
+<VirtualHost *:${WEB_PORT}>
     ServerAdmin webmaster@localhost
     DocumentRoot /var/www/html/${WEB_ROOT}
 
@@ -353,7 +131,7 @@ ibase.timeformat = "%H:%M:%S"
 mysqli.max_persistent = -1
 mysqli.allow_persistent = On
 mysqli.max_links = -1
-mysqli.default_port = 3306
+mysqli.default_port = ${MYSQL_PORT}
 mysqli.default_socket =
 mysqli.default_host =
 mysqli.default_user =
@@ -480,101 +258,168 @@ pid-file=/var/run/mysqld/mysqld.pid
 EOF
 }
 
-# Function for interactive setup
-interactive_setup() {
-    read -p "Enter web server port (default: 8080): " WEB_SERVER_PORT
-    WEB_SERVER_PORT=${WEB_SERVER_PORT:-8080}
+# Function to create Dockerfile
+create_dockerfile() {
+    cat <<EOF > Dockerfile
+# Use the official Ubuntu 20.04 image as the base image
+FROM ubuntu:20.04
 
-    read -p "Enter PHP version (default: 7.4): " PHP_VERSION
-    PHP_VERSION=${PHP_VERSION:-7.4}
+# Set environment variables
+ENV DEBIAN_FRONTEND=noninteractive
 
-    read -p "Enter Git repository URL (default: https://github.com/your-repo/your-project.git): " GIT_REPO_URL
-    GIT_REPO_URL=${GIT_REPO_URL:-"https://github.com/your-repo/your-project.git"}
+# Add required repositories
+RUN apt-get update && \\
+    apt-get install -y software-properties-common && \\
+    add-apt-repository ppa:ondrej/php -y && \\
+    add-apt-repository ppa:ondrej/apache2 -y && \\
+    apt-get update
 
-    read -p "Enter project directory (default: /var/www/html): " PROJECT_DIR
-    PROJECT_DIR=${PROJECT_DIR:-"/var/www/html"}
+# Install required packages
+RUN apt-get install -y \\
+    apache2 \\
+    mysql-server \\
+    redis-server \\
+    supervisor \\
+    gearman-job-server \\
+    php${PHP_VERSION}-apc \\
+    php${PHP_VERSION}-bcmath \\
+    php${PHP_VERSION}-intl \\
+    php${PHP_VERSION}-cli \\
+    php${PHP_VERSION}-curl \\
+    php${PHP_VERSION}-imap \\
+    php${PHP_VERSION}-imagick \\
+    php${PHP_VERSION}-gd \\
+    php${PHP_VERSION}-mysql \\
+    php${PHP_VERSION}-zip \\
+    php${PHP_VERSION}-xml \\
+    php${PHP_VERSION}-soap \\
+    php${PHP_VERSION}-ssh2 \\
+    php${PHP_VERSION}-gearman \\
+    php${PHP_VERSION}-redis \\
+    php${PHP_VERSION}-apcu \\
+    php${PHP_VERSION}-mbstring \\
+    php${PHP_VERSION}-mongodb \\
+    php${PHP_VERSION}-mailparse \\
+    php${PHP_VERSION}-tidy \\
+    php${PHP_VERSION}-gmp \\
+    php${PHP_VERSION}-sqlite3 \\
+    php${PHP_VERSION}-mcrypt \\
+    php${PHP_VERSION}-dev \\
+    php${PHP_VERSION}-xdebug \\
+    php${PHP_VERSION}-pgsql \\
+    php${PHP_VERSION}-opcache \\
+    php${PHP_VERSION}-iconv \\
+    php${PHP_VERSION}-maxminddb \\
+    php-pear
 
-    read -p "Enter web root directory (default: public): " WEB_ROOT
-    WEB_ROOT=${WEB_ROOT:-"public"}
+# Set MySQL root password and create database and user
+RUN echo "mysql-server mysql-server/root_password password ${MYSQL_ROOT_PASSWORD}" | debconf-set-selections && \\
+    echo "mysql-server mysql-server/root_password_again password ${MYSQL_ROOT_PASSWORD}" | debconf-set-selections && \\
+    apt-get install -y mysql-server && \\
+    service mysql start && \\
+    mysql -u root -p${MYSQL_ROOT_PASSWORD} -e "CREATE DATABASE ${MYSQL_DATABASE};" && \\
+    mysql -u root -p${MYSQL_ROOT_PASSWORD} -e "CREATE USER '${MYSQL_USER}'@'localhost' IDENTIFIED BY '${MYSQL_PASSWORD}';" && \\
+    mysql -u root -p${MYSQL_ROOT_PASSWORD} -e "CREATE USER '${MYSQL_USER}'@'%' IDENTIFIED BY '${MYSQL_PASSWORD}';" && \\
+    mysql -u root -p${MYSQL_ROOT_PASSWORD} -e "GRANT ALL PRIVILEGES ON ${MYSQL_DATABASE}.* TO '${MYSQL_USER}'@'localhost';" && \\
+    mysql -u root -p${MYSQL_ROOT_PASSWORD} -e "GRANT ALL PRIVILEGES ON ${MYSQL_DATABASE}.* TO '${MYSQL_USER}'@'%';" && \\
+    mysql -u root -p${MYSQL_ROOT_PASSWORD} -e "FLUSH PRIVILEGES;"
 
-    read -p "Enter PHP extensions (default: apc bcmath intl cli fpm curl imap imagick gd mysql zip xml soap ssh2 gearman redis apcu mbstring mongodb mailparse tidy gmp sqlite3 mcrypt dev xdebug pgsql opcache gearman maxmind2): " PHP_EXTENSIONS
-    PHP_EXTENSIONS=${PHP_EXTENSIONS:-"apc bcmath intl cli fpm curl imap imagick gd mysql zip xml soap ssh2 gearman redis apcu mbstring mongodb mailparse tidy gmp sqlite3 mcrypt dev xdebug pgsql opcache gearman maxmind2"}
+# Expose ports
+EXPOSE ${WEB_PORT} ${MYSQL_PORT}
 
-    read -p "Enter MySQL root password (default: generated): " MYSQL_ROOT_PASSWORD
-    MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:-$(openssl rand -base64 12)}
+# Set up persistent volumes
+VOLUME ["/var/www/html", "/etc/apache2", "/etc/mysql", "/etc/supervisor", "/etc/php/\${PHP_VERSION}/apache2"]
 
-    read -p "Enter MySQL database name (default: example_db): " MYSQL_DATABASE
-    MYSQL_DATABASE=${MYSQL_DATABASE:-"example_db"}
+# Copy configuration files
+COPY ${CONFIG_DIR}/supervisord.conf /etc/supervisor/supervisord.conf
+COPY ${CONFIG_DIR}/apache2/000-default.conf /etc/apache2/sites-available/000-default.conf
+COPY ${CONFIG_DIR}/php.ini /etc/php/\${PHP_VERSION}/apache2/php.ini
+COPY ${CONFIG_DIR}/my.cnf /etc/mysql/my.cnf
 
-    read -p "Enter MySQL user (default: example_user): " MYSQL_USER
-    MYSQL_USER=${MYSQL_USER:-"example_user"}
-
-    read -p "Enter MySQL user password (default: generated): " MYSQL_PASSWORD
-    MYSQL_PASSWORD=${MYSQL_PASSWORD:-$(openssl rand -base64 12)}
-}
-
-# Function to update PHP version
-update_php_version() {
-    read -p "Enter new PHP version: " NEW_PHP_VERSION
-    PHP_VERSION=$NEW_PHP_VERSION
-    create_dockerfile
-    create_supervisor_dockerfile
-    docker-compose build
-    docker-compose up -d
-    echo "PHP version updated to $NEW_PHP_VERSION."
-}
-
-# Function to write credentials to a file
-write_credentials() {
-    cat <<EOF > credentials.txt
-Web Server Port: $WEB_SERVER_PORT
-PHP Version: $PHP_VERSION
-Git Repository URL: $GIT_REPO_URL
-Project Directory: $PROJECT_DIR
-Web Root Directory: $WEB_ROOT
-PHP Extensions: $PHP_EXTENSIONS
-MySQL Root Password: $MYSQL_ROOT_PASSWORD
-MySQL Database: $MYSQL_DATABASE
-MySQL User: $MYSQL_USER
-MySQL Password: $MYSQL_PASSWORD
+# Start services
+CMD ["/usr/bin/supervisord"]
 EOF
 }
 
-# Parse command-line arguments
-while [[ "$#" -gt 0 ]]; do
-    case $1 in
-        -p|--port=*) WEB_SERVER_PORT="${1#*=}"; shift ;;
-        -v|--php-version=*) PHP_VERSION="${1#*=}"; shift ;;
-        -g|--git-repo=*) GIT_REPO_URL="${1#*=}"; shift ;;
-        -d|--project-dir=*) PROJECT_DIR="${1#*=}"; shift ;;
-        -r|--web-root=*) WEB_ROOT="${1#*=}"; shift ;;
-        -e|--php-extensions=*) PHP_EXTENSIONS="${1#*=}"; shift ;;
-        -m|--mysql-root-pw=*) MYSQL_ROOT_PASSWORD="${1#*=}"; shift ;;
-        -b|--mysql-db=*) MYSQL_DATABASE="${1#*=}"; shift ;;
-        -u|--mysql-user=*) MYSQL_USER="${1#*=}"; shift ;;
-        -w|--mysql-pw=*) MYSQL_PASSWORD="${1#*=}"; shift ;;
-        -h|--help) show_help; exit 0 ;;
-        -i|--interactive) interactive_setup; shift ;;
-        -c|--git-command=*) GIT_COMMAND="${1#*=}"; shift ;;
-        -u|--update-php) update_php_version; shift ;;
-        *) echo "Unknown parameter passed: $1"; show_help; exit 1 ;;
+# Function to create docker-compose.yml
+create_docker_compose() {
+    cat <<EOF > docker-compose.yml
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        PHP_VERSION: \${PHP_VERSION}
+        MYSQL_ROOT_PASSWORD: \${MYSQL_ROOT_PASSWORD}
+        MYSQL_DATABASE: \${MYSQL_DATABASE}
+        MYSQL_USER: \${MYSQL_USER}
+        MYSQL_PASSWORD: \${MYSQL_PASSWORD}
+    ports:
+      - "${WEB_PORT}:${WEB_PORT}"
+      - "${MYSQL_PORT}:${MYSQL_PORT}"
+    volumes:
+      - ./${CONFIG_DIR}/apache2/000-default.conf:/etc/apache2/sites-available/000-default.conf
+      - ./${CONFIG_DIR}/supervisord.conf:/etc/supervisor/supervisord.conf
+      - ./${CONFIG_DIR}/php.ini:/etc/php/\${PHP_VERSION}/apache2/php.ini
+      - ./${CONFIG_DIR}/my.cnf:/etc/mysql/my.cnf
+      - ./${MYSQL_DATA}:/var/lib/mysql
+      - ./${WEB_ROOT}:/var/www/html
+    environment:
+      MYSQL_ROOT_PASSWORD: \${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: \${MYSQL_DATABASE}
+      MYSQL_USER: \${MYSQL_USER}
+      MYSQL_PASSWORD: \${MYSQL_PASSWORD}
+EOF
+}
+
+# Interactive configuration for PHP version
+echo "Select PHP version:"
+select php_version in 5.6 7.1 7.2 7.3 7.4 8.0 8.1 8.2 8.3; do
+    case $php_version in
+        5.6|7.1|7.2|7.3|7.4|8.0|8.1|8.2|8.3)
+            export PHP_VERSION=$php_version
+            break
+            ;;
+        *)
+            echo "Invalid option. Please select a valid PHP version."
+            ;;
     esac
-    shift
 done
 
-# Main script execution
-check_docker
-check_git
-mkdir -p "${WEBROOT_DIR}"
-mkdir -p "${MYSQLDATA_DIR}"
-mkdir -p "${LOGS_DIR}"
-clone_repo
-execute_git_command
-create_docker_compose
-create_dockerfile
-create_supervisor_dockerfile
+# Interactive configuration for MySQL credentials
+read -p "Enter MySQL root password: " MYSQL_ROOT_PASSWORD
+read -p "Enter MySQL database name: " MYSQL_DATABASE
+read -p "Enter MySQL user: " MYSQL_USER
+read -p "Enter MySQL user password: " MYSQL_PASSWORD
+
+# Interactive configuration for ports
+read -p "Enter web port (default 80): " WEB_PORT
+WEB_PORT=${WEB_PORT:-80}
+read -p "Enter MySQL port (default 3306): " MYSQL_PORT
+MYSQL_PORT=${MYSQL_PORT:-3306}
+
+# Write credentials to a file
+cat <<EOF > credentials.env
+PHP_VERSION=${PHP_VERSION}
+MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+MYSQL_DATABASE=${MYSQL_DATABASE}
+MYSQL_USER=${MYSQL_USER}
+MYSQL_PASSWORD=${MYSQL_PASSWORD}
+WEB_PORT=${WEB_PORT}
+MYSQL_PORT=${MYSQL_PORT}
+EOF
+
+# Create configuration files
 create_supervisor_conf
 create_apache_config_dir
 create_php_ini
 create_my_cnf
-write_credentials
+create_dockerfile
+create_docker_compose
+
+# Build the Docker image
+docker compose build
+
+# Run the Docker container
+docker compose up -d
