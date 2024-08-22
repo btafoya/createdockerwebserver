@@ -5,9 +5,15 @@ CONFIG_DIR="config"
 WEB_ROOT="web_root"
 MYSQL_DATA="mysql_data"
 
-# Default ports
-WEB_PORT=80
-MYSQL_PORT=3306
+# Function to check if a port is available
+is_port_available() {
+    local port=$1
+    if lsof -i :$port -sTCP:LISTEN -t >/dev/null ; then
+        return 1
+    else
+        return 0
+    fi
+}
 
 # Function to create Supervisor configuration file
 create_supervisor_conf() {
@@ -251,6 +257,8 @@ datadir=/var/lib/mysql
 socket=/var/lib/mysql/mysql.sock
 user=mysql
 symbolic-links=0
+port=${MYSQL_PORT}
+bind-address=0.0.0.0
 
 [mysqld_safe]
 log-error=/var/log/mysql/mysqld.log
@@ -261,8 +269,8 @@ EOF
 # Function to create Dockerfile
 create_dockerfile() {
     cat <<EOF > Dockerfile
-# Use the official Ubuntu 20.04 image as the base image
-FROM ubuntu:20.04
+# Use the official Ubuntu ${UBUNTU_VERSION} image as the base image
+FROM ubuntu:${UBUNTU_VERSION}
 
 # Set environment variables
 ENV DEBIAN_FRONTEND=noninteractive
@@ -312,6 +320,9 @@ RUN apt-get install -y \\
     php${PHP_VERSION}-maxminddb \\
     php-pear
 
+# Enable Apache modules
+RUN a2enmod access_compat actions alias auth_basic authn_core authn_file authz_core authz_host authz_user autoindex cgid deflate dir env expires fcgid filter headers include mime mpm_event negotiation proxy_ajp proxy_balancer proxy_fcgi proxy_http proxy reqtimeout rewrite setenvif slotmem_shm socache_shmcb
+
 # Set MySQL root password and create database and user
 RUN echo "mysql-server mysql-server/root_password password ${MYSQL_ROOT_PASSWORD}" | debconf-set-selections && \\
     echo "mysql-server mysql-server/root_password_again password ${MYSQL_ROOT_PASSWORD}" | debconf-set-selections && \\
@@ -355,9 +366,12 @@ services:
         MYSQL_DATABASE: \${MYSQL_DATABASE}
         MYSQL_USER: \${MYSQL_USER}
         MYSQL_PASSWORD: \${MYSQL_PASSWORD}
+        WEB_PORT: \${WEB_PORT}
+        MYSQL_PORT: \${MYSQL_PORT}
+        UBUNTU_VERSION: \${UBUNTU_VERSION}
     ports:
-      - "${WEB_PORT}:${WEB_PORT}"
-      - "${MYSQL_PORT}:${MYSQL_PORT}"
+      - "\${WEB_PORT}:${WEB_PORT}"
+      - "\${MYSQL_PORT}:${MYSQL_PORT}"
     volumes:
       - ./${CONFIG_DIR}/apache2/000-default.conf:/etc/apache2/sites-available/000-default.conf
       - ./${CONFIG_DIR}/supervisord.conf:/etc/supervisor/supervisord.conf
@@ -387,6 +401,20 @@ select php_version in 5.6 7.1 7.2 7.3 7.4 8.0 8.1 8.2 8.3; do
     esac
 done
 
+# Interactive configuration for Ubuntu version
+echo "Select Ubuntu version:"
+select ubuntu_version in 24.04 22.04 20.04; do
+    case $ubuntu_version in
+        24.04|22.04|20.04)
+            export UBUNTU_VERSION=$ubuntu_version
+            break
+            ;;
+        *)
+            echo "Invalid option. Please select a valid Ubuntu version."
+            ;;
+    esac
+done
+
 # Interactive configuration for MySQL credentials
 read -p "Enter MySQL root password: " MYSQL_ROOT_PASSWORD
 read -p "Enter MySQL database name: " MYSQL_DATABASE
@@ -394,14 +422,32 @@ read -p "Enter MySQL user: " MYSQL_USER
 read -p "Enter MySQL user password: " MYSQL_PASSWORD
 
 # Interactive configuration for ports
-read -p "Enter web port (default 80): " WEB_PORT
-WEB_PORT=${WEB_PORT:-80}
-read -p "Enter MySQL port (default 3306): " MYSQL_PORT
-MYSQL_PORT=${MYSQL_PORT:-3306}
+while true; do
+    read -p "Enter web port (default 8080): " WEB_PORT
+    WEB_PORT=${WEB_PORT:-8080}
+    if is_port_available $WEB_PORT; then
+        echo "Port $WEB_PORT is available."
+        break
+    else
+        echo "Port $WEB_PORT is not available. Please choose another port."
+    fi
+done
+
+while true; do
+    read -p "Enter MySQL port (default 3306): " MYSQL_PORT
+    MYSQL_PORT=${MYSQL_PORT:-3306}
+    if is_port_available $MYSQL_PORT; then
+        echo "Port $MYSQL_PORT is available."
+        break
+    else
+        echo "Port $MYSQL_PORT is not available. Please choose another port."
+    fi
+done
 
 # Write credentials to a file
-cat <<EOF > credentials.env
+cat <<EOF > .env
 PHP_VERSION=${PHP_VERSION}
+UBUNTU_VERSION=${UBUNTU_VERSION}
 MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
 MYSQL_DATABASE=${MYSQL_DATABASE}
 MYSQL_USER=${MYSQL_USER}
@@ -417,6 +463,17 @@ create_php_ini
 create_my_cnf
 create_dockerfile
 create_docker_compose
+
+# Create the web_root directory and index.php file
+mkdir -p "${WEB_ROOT}"
+cat <<EOF > ${WEB_ROOT}/index.php
+<?php
+phpinfo();
+?>
+EOF
+
+# Create the mysql_data directory
+mkdir -p "${MYSQL_DATA}"
 
 # Build the Docker image
 docker compose build
