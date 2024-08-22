@@ -112,7 +112,6 @@ execute_git_command() {
 # Function to create Docker Compose file
 create_docker_compose() {
     cat <<EOF > docker-compose.yml
-version: '3'
 services:
   web:
     build:
