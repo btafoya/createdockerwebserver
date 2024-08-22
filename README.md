@@ -1,6 +1,6 @@
 # Create Docker Web Server
 
-This repository contains a script to set up a Dockerized web server with PHP and MySQL, including configuration for Apache, PHP extensions, and Supervisor.
+This repository contains a script to set up a Dockerized web server with PHP and MySQL, including configuration for Apache, PHP extensions, and Supervisor. This script is designed to run on Debian based distros.
 
 ## Features
 
