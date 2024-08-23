@@ -18,48 +18,24 @@ This repository contains a script to set up a web application environment on a U
 - Docker & Docker Compose
 - Git
 
-This script sets up a Dockerized web application environment with Apache, PHP, MySQL, and Supervisor.
-
-## Features
-
-- Interactive configuration for PHP version, MySQL credentials, and ports.
-- Stores MySQL data outside of the Docker image.
-- Generates Dockerfile and docker-compose.yml.
-- Builds and runs the Docker container.
-
-## Usage
-
-1. Make the script executable:
-
-    ```bash
-    chmod +x createdockerwebserver.sh
-    ```
-
-2. Run the script:
-
-    ```bash
-    ./createdockerwebserver.sh
-    ```
-
-3. Follow the interactive prompts to configure PHP version, MySQL credentials, and ports.
-
-## Configuration
-
-- **PHP Version**: Select from the list of available versions.
-- **MySQL Credentials**: Enter root password, database name, user, and user password.
-- **Ports**: Enter web port (default 80) and MySQL port (default 3306).
-
 ## Directory Structure
+The script creates the following directory structure:
 
-- `config`: Directory for configuration files.
-- `web_root`: Directory for web application files.
-- `mysql_data`: Directory for MySQL data.
-
-## Files
-
-- `Dockerfile`: Dockerfile for building the Docker image.
-- `docker-compose.yml`: Docker Compose file for running the Docker container.
-- `credentials.env`: File containing the configuration values.
+```text
+config/
+├── apache2/
+│   └── 000-default.conf
+├── php.ini
+├── my.cnf
+├── supervisord.conf
+├── init.sql (if SQL file is provided)
+web_root/
+├── index.php
+mysql_data/
+Dockerfile
+docker-compose.yml
+.env
+```
 
 ## Commands
 
@@ -68,6 +44,14 @@ This script sets up a Dockerized web application environment with Apache, PHP, M
     ```bash
     docker compose build
     ```
+
+    Follow the interactive prompts to configure the environment. The script will generate the necessary configuration files, build the Docker image, and run the container.
+- **Build and Insert data into newly created MySQL Database**
+
+    ```bash
+    ./createdockerwebserver.sh path/to/your/sqlfile.sql
+    ```
+    Follow the interactive prompts to configure the environment. The script will generate the necessary configuration files, build the Docker image, and run the container.
 
 - **Run the Docker container**:
 
