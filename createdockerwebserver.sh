@@ -328,12 +328,12 @@ RUN echo "mysql-server mysql-server/root_password password ${MYSQL_ROOT_PASSWORD
     echo "mysql-server mysql-server/root_password_again password ${MYSQL_ROOT_PASSWORD}" | debconf-set-selections && \\
     apt-get install -y mysql-server && \\
     service mysql start && \\
-    MYSQL -u root -p${MYSQL_ROOT_PASSWORD} -e "CREATE DATABASE ${MYSQL_DATABASE};" && \\
-    MYSQL -u root -p${MYSQL_ROOT_PASSWORD} -e "CREATE USER '${MYSQL_USER}'@'localhost' IDENTIFIED BY '${MYSQL_PASSWORD}';" && \\
-    MYSQL -u root -p${MYSQL_ROOT_PASSWORD} -e "CREATE USER '${MYSQL_USER}'@'%' IDENTIFIED BY '${MYSQL_PASSWORD}';" && \\
-    MYSQL -u root -p${MYSQL_ROOT_PASSWORD} -e "GRANT ALL PRIVILEGES ON ${MYSQL_DATABASE}.* TO '${MYSQL_USER}'@'localhost';" && \\
-    MYSQL -u root -p${MYSQL_ROOT_PASSWORD} -e "GRANT ALL PRIVILEGES ON ${MYSQL_DATABASE}.* TO '${MYSQL_USER}'@'%';" && \\
-    MYSQL -u root -p${MYSQL_ROOT_PASSWORD} -e "FLUSH PRIVILEGES;"
+    mysql -u root -p${MYSQL_ROOT_PASSWORD} -e "CREATE DATABASE ${MYSQL_DATABASE};" && \\
+    mysql -u root -p${MYSQL_ROOT_PASSWORD} -e "CREATE USER '${MYSQL_USER}'@'localhost' IDENTIFIED BY '${MYSQL_PASSWORD}';" && \\
+    mysql -u root -p${MYSQL_ROOT_PASSWORD} -e "CREATE USER '${MYSQL_USER}'@'%' IDENTIFIED BY '${MYSQL_PASSWORD}';" && \\
+    mysql -u root -p${MYSQL_ROOT_PASSWORD} -e "GRANT ALL PRIVILEGES ON ${MYSQL_DATABASE}.* TO '${MYSQL_USER}'@'localhost';" && \\
+    mysql -u root -p${MYSQL_ROOT_PASSWORD} -e "GRANT ALL PRIVILEGES ON ${MYSQL_DATABASE}.* TO '${MYSQL_USER}'@'%';" && \\
+    mysql -u root -p${MYSQL_ROOT_PASSWORD} -e "FLUSH PRIVILEGES;"
 
 # Expose ports
 EXPOSE ${WEB_PORT} ${MYSQL_PORT}
@@ -408,76 +408,94 @@ handle_sql_file() {
     sed -i '/ service mysql start/a COPY ${CONFIG_DIR}/init.sql /docker-entrypoint-initdb.d/init.sql' Dockerfile
 }
 
-# Interactive configuration for PHP version
-echo "Select PHP version:"
-select php_version in 5.6 7.1 7.2 7.3 7.4 8.0 8.1 8.2 8.3; do
-    case $php_version in
-        5.6|7.1|7.2|7.3|7.4|8.0|8.1|8.2|8.3)
-            export PHP_VERSION=$php_version
+# Load values from .env file if it exists
+if [ -f .env ]; then
+    export $(grep -v '^#' .env | xargs)
+else
+    # Interactive configuration for PHP version
+    echo "Select PHP version:"
+    select php_version in 5.6 7.1 7.2 7.3 7.4 8.0 8.1 8.2 8.3; do
+        case $php_version in
+            5.6|7.1|7.2|7.3|7.4|8.0|8.1|8.2|8.3)
+                export PHP_VERSION=$php_version
+                break
+                ;;
+            *)
+                echo "Invalid option. Please select a valid PHP version."
+                ;;
+        esac
+    done
+
+    # Interactive configuration for Ubuntu version
+    echo "Select Ubuntu version:"
+    select ubuntu_version in 24.04 22.04 20.04; do
+        case $ubuntu_version in
+            24.04|22.04|20.04)
+                export UBUNTU_VERSION=$ubuntu_version
+                break
+                ;;
+            *)
+                echo "Invalid option. Please select a valid Ubuntu version."
+                ;;
+        esac
+    done
+
+    # Interactive configuration for MySQL credentials
+    read -p "Enter MySQL root password: " MYSQL_ROOT_PASSWORD
+    read -p "Enter MySQL database name: " MYSQL_DATABASE
+    read -p "Enter MySQL user: " MYSQL_USER
+    read -p "Enter MySQL user password: " MYSQL_PASSWORD
+
+    # Interactive configuration for ports
+    while true; do
+        read -p "Enter web port (default 8080): " WEB_PORT
+        WEB_PORT=${WEB_PORT:-8080}
+        if is_port_available $WEB_PORT; then
+            echo "Port $WEB_PORT is available."
             break
-            ;;
-        *)
-            echo "Invalid option. Please select a valid PHP version."
-            ;;
-    esac
-done
+        else
+            echo "Port $WEB_PORT is not available. Please choose another port."
+        fi
+    done
 
-# Interactive configuration for Ubuntu version
-echo "Select Ubuntu version:"
-select ubuntu_version in 24.04 22.04 20.04; do
-    case $ubuntu_version in
-        24.04|22.04|20.04)
-            export UBUNTU_VERSION=$ubuntu_version
+    while true; do
+        read -p "Enter MySQL port (default 3306): " MYSQL_PORT
+        MYSQL_PORT=${MYSQL_PORT:-3306}
+        if is_port_available $MYSQL_PORT; then
+            echo "Port $MYSQL_PORT is available."
             break
-            ;;
-        *)
-            echo "Invalid option. Please select a valid Ubuntu version."
-            ;;
-    esac
-done
+        else
+            echo "Port $MYSQL_PORT is not available. Please choose another port."
+        fi
+    done
 
-# Interactive configuration for MySQL credentials
-read -p "Enter MySQL root password: " MYSQL_ROOT_PASSWORD
-read -p "Enter MySQL database name: " MYSQL_DATABASE
-read -p "Enter MySQL user: " MYSQL_USER
-read -p "Enter MySQL user password: " MYSQL_PASSWORD
+    # Interactive configuration for timezone
+    echo "Select timezone (default America/New_York):"
+    select timezone in America/New_York America/Los_Angeles America/Chicago America/Denver America/Phoenix America/Anchorage America/Juneau America/Detroit America/Indiana/Indianapolis America/Indiana/Marengo America/Indiana/Knox America/Indiana/Vevay America/Indiana/Tell_City America/Indiana/Petersburg America/Indiana/Vincennes America/Indiana/Winamac America/Kentucky/Monticello America/Kentucky/Louisville America/North_Dakota/Center America/North_Dakota/New_Salem America/North_Dakota/Beulah; do
+        case $timezone in
+            America/New_York|America/Los_Angeles|America/Chicago|America/Denver|America/Phoenix|America/Anchorage|America/Juneau|America/Detroit|America/Indiana/Indianapolis|America/Indiana/Marengo|America/Indiana/Knox|America/Indiana/Vevay|America/Indiana/Tell_City|America/Indiana/Petersburg|America/Indiana/Vincennes|America/Indiana/Winamac|America/Kentucky/Monticello|America/Kentucky/Louisville|America/North_Dakota/Center|America/North_Dakota/New_Salem|America/North_Dakota/Beulah)
+                export TIMEZONE=$timezone
+                break
+                ;;
+            *)
+                echo "Invalid option. Please select a valid timezone."
+                ;;
+        esac
+    done
 
-# Interactive configuration for ports
-while true; do
-    read -p "Enter web port (default 8080): " WEB_PORT
-    WEB_PORT=${WEB_PORT:-8080}
-    if is_port_available $WEB_PORT; then
-        echo "Port $WEB_PORT is available."
-        break
-    else
-        echo "Port $WEB_PORT is not available. Please choose another port."
-    fi
-done
-
-while true; do
-    read -p "Enter MySQL port (default 3306): " MYSQL_PORT
-    MYSQL_PORT=${MYSQL_PORT:-3306}
-    if is_port_available $MYSQL_PORT; then
-        echo "Port $MYSQL_PORT is available."
-        break
-    else
-        echo "Port $MYSQL_PORT is not available. Please choose another port."
-    fi
-done
-
-# Interactive configuration for timezone
-echo "Select timezone (default America/New_York):"
-select timezone in America/New_York America/Los_Angeles America/Chicago America/Denver America/Phoenix America/Anchorage America/Juneau America/Detroit America/Indiana/Indianapolis America/Indiana/Marengo America/Indiana/Knox America/Indiana/Vevay America/Indiana/Tell_City America/Indiana/Petersburg America/Indiana/Vincennes America/Indiana/Winamac America/Kentucky/Monticello America/Kentucky/Louisville America/North_Dakota/Center America/North_Dakota/New_Salem America/North_Dakota/Beulah; do
-    case $timezone in
-        America/New_York|America/Los_Angeles|America/Chicago|America/Denver|America/Phoenix|America/Anchorage|America/Juneau|America/Detroit|America/Indiana/Indianapolis|America/Indiana/Marengo|America/Indiana/Knox|America/Indiana/Vevay|America/Indiana/Tell_City|America/Indiana/Petersburg|America/Indiana/Vincennes|America/Indiana/Winamac|America/Kentucky/Monticello|America/Kentucky/Louisville|America/North_Dakota/Center|America/North_Dakota/New_Salem|America/North_Dakota/Beulah)
-            export TIMEZONE=$timezone
-            break
-            ;;
-        *)
-            echo "Invalid option. Please select a valid timezone."
-            ;;
-    esac
-done
+    # Write credentials to a file
+    cat <<EOF > .env
+PHP_VERSION=${PHP_VERSION}
+UBUNTU_VERSION=${UBUNTU_VERSION}
+MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+MYSQL_DATABASE=${MYSQL_DATABASE}
+MYSQL_USER=${MYSQL_USER}
+MYSQL_PASSWORD=${MYSQL_PASSWORD}
+WEB_PORT=${WEB_PORT}
+MYSQL_PORT=${MYSQL_PORT}
+TIMEZONE=${TIMEZONE}
+EOF
+fi
 
 # Create configuration files
 create_supervisor_conf
@@ -491,19 +509,6 @@ create_docker_compose
 if [ -n "$1" ]; then
     handle_sql_file "$1"
 fi
-
-# Write credentials to a file
-cat <<EOF > .env
-PHP_VERSION=${PHP_VERSION}
-UBUNTU_VERSION=${UBUNTU_VERSION}
-MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
-MYSQL_DATABASE=${MYSQL_DATABASE}
-MYSQL_USER=${MYSQL_USER}
-MYSQL_PASSWORD=${MYSQL_PASSWORD}
-WEB_PORT=${WEB_PORT}
-MYSQL_PORT=${MYSQL_PORT}
-TIMEZONE=${TIMEZONE}
-EOF
 
 # Create the web_root directory and index.php file
 mkdir -p "${WEB_ROOT}"
