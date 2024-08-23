@@ -328,12 +328,12 @@ RUN echo "mysql-server mysql-server/root_password password ${MYSQL_ROOT_PASSWORD
     echo "mysql-server mysql-server/root_password_again password ${MYSQL_ROOT_PASSWORD}" | debconf-set-selections && \\
     apt-get install -y mysql-server && \\
     service mysql start && \\
-    mysql -u root -p${MYSQL_ROOT_PASSWORD} -e "CREATE DATABASE ${MYSQL_DATABASE};" && \\
-    mysql -u root -p${MYSQL_ROOT_PASSWORD} -e "CREATE USER '${MYSQL_USER}'@'localhost' IDENTIFIED BY '${MYSQL_PASSWORD}';" && \\
-    mysql -u root -p${MYSQL_ROOT_PASSWORD} -e "CREATE USER '${MYSQL_USER}'@'%' IDENTIFIED BY '${MYSQL_PASSWORD}';" && \\
-    mysql -u root -p${MYSQL_ROOT_PASSWORD} -e "GRANT ALL PRIVILEGES ON ${MYSQL_DATABASE}.* TO '${MYSQL_USER}'@'localhost';" && \\
-    mysql -u root -p${MYSQL_ROOT_PASSWORD} -e "GRANT ALL PRIVILEGES ON ${MYSQL_DATABASE}.* TO '${MYSQL_USER}'@'%';" && \\
-    mysql -u root -p${MYSQL_ROOT_PASSWORD} -e "FLUSH PRIVILEGES;"
+    MYSQL -u root -p${MYSQL_ROOT_PASSWORD} -e "CREATE DATABASE ${MYSQL_DATABASE};" && \\
+    MYSQL -u root -p${MYSQL_ROOT_PASSWORD} -e "CREATE USER '${MYSQL_USER}'@'localhost' IDENTIFIED BY '${MYSQL_PASSWORD}';" && \\
+    MYSQL -u root -p${MYSQL_ROOT_PASSWORD} -e "CREATE USER '${MYSQL_USER}'@'%' IDENTIFIED BY '${MYSQL_PASSWORD}';" && \\
+    MYSQL -u root -p${MYSQL_ROOT_PASSWORD} -e "GRANT ALL PRIVILEGES ON ${MYSQL_DATABASE}.* TO '${MYSQL_USER}'@'localhost';" && \\
+    MYSQL -u root -p${MYSQL_ROOT_PASSWORD} -e "GRANT ALL PRIVILEGES ON ${MYSQL_DATABASE}.* TO '${MYSQL_USER}'@'%';" && \\
+    MYSQL -u root -p${MYSQL_ROOT_PASSWORD} -e "FLUSH PRIVILEGES;"
 
 # Expose ports
 EXPOSE ${WEB_PORT} ${MYSQL_PORT}
@@ -479,6 +479,14 @@ select timezone in America/New_York America/Los_Angeles America/Chicago America/
     esac
 done
 
+# Create configuration files
+create_supervisor_conf
+create_apache_config_dir
+create_php_ini
+create_my_cnf
+create_dockerfile
+create_docker_compose
+
 # Handle SQL file if provided
 if [ -n "$1" ]; then
     handle_sql_file "$1"
@@ -496,14 +504,6 @@ WEB_PORT=${WEB_PORT}
 MYSQL_PORT=${MYSQL_PORT}
 TIMEZONE=${TIMEZONE}
 EOF
-
-# Create configuration files
-create_supervisor_conf
-create_apache_config_dir
-create_php_ini
-create_my_cnf
-create_dockerfile
-create_docker_compose
 
 # Create the web_root directory and index.php file
 mkdir -p "${WEB_ROOT}"
