@@ -39,25 +39,19 @@ docker-compose.yml
 
 ## Commands
 
-- **Build the Docker image**:
+- **Configure and Build the Docker image**:
 
     ```bash
-    docker compose build
+    ./createdockerwebserver.sh
     ```
 
     Follow the interactive prompts to configure the environment. The script will generate the necessary configuration files, build the Docker image, and run the container.
-- **Build and Insert data into newly created MySQL Database**
+- **Configure and Build the Docker image and Insert data into newly created MySQL Database**
 
     ```bash
     ./createdockerwebserver.sh path/to/your/sqlfile.sql
     ```
     Follow the interactive prompts to configure the environment. The script will generate the necessary configuration files, build the Docker image, and run the container.
-
-- **Run the Docker container**:
-
-    ```bash
-    docker compose up -d
-    ```
 
 ## Contributing
 
