@@ -4,6 +4,7 @@
 CONFIG_DIR="config"
 WEB_ROOT="web_root"
 MYSQL_DATA="mysql_data"
+LOG_DIR="log_dir"  # Define the log directory
 
 # Function to check if a port is available
 is_port_available() {
@@ -37,16 +38,16 @@ create_apache_config_dir() {
     cat <<EOF > ${CONFIG_DIR}/apache2/000-default.conf
 <VirtualHost *:${WEB_PORT}>
     ServerAdmin webmaster@localhost
-    DocumentRoot /var/www/html/${WEB_ROOT}
+    DocumentRoot /var/www/html
 
-    <Directory /var/www/html/${WEB_ROOT}>
+    <Directory /var/www/html>
         Options Indexes FollowSymLinks
         AllowOverride All
         Require all granted
     </Directory>
 
-    ErrorLog \${APACHE_LOG_DIR}/error.log
-    CustomLog \${APACHE_LOG_DIR}/access.log combined
+    ErrorLog /var/log/apache2/error.log
+    CustomLog ${LOG_DIR}/apache2/access.log combined
 </VirtualHost>
 EOF
 }
@@ -67,7 +68,6 @@ serialize_precision = -1
 disable_functions =
 disable_classes =
 zend.enable_gc = On
-expose_php = Off
 max_execution_time = 90
 max_input_time = 60
 max_input_vars = 10007
@@ -76,6 +76,7 @@ error_reporting = E_ALL & ~E_DEPRECATED & ~E_STRICT
 display_errors = On
 display_startup_errors = Off
 log_errors = On
+error_log = /var/log/php/php.log
 log_errors_max_len = 1024
 ignore_repeated_errors = Off
 ignore_repeated_source = Off
@@ -222,7 +223,7 @@ opcache.blacklist_filename=
 opcache.max_file_size=0
 opcache.consistency_checks=0
 opcache.force_restart_timeout=180
-opcache.error_log=
+opcache.error_log=/var/log/opcache/opcache.log
 opcache.log_verbosity_level=1
 opcache.preferred_memory_model=
 opcache.protect_memory=0
@@ -388,6 +389,7 @@ services:
       - ./${MYSQL_DATA}:/var/lib/mysql
       - ./${WEB_ROOT}:/var/www/html
       - ./${CONFIG_DIR}/mysql_create.sql:/etc/mysql/mysql_create.sql
+      - ./${LOG_DIR}:/var/log
     environment:
       MYSQL_ROOT_PASSWORD: \${MYSQL_ROOT_PASSWORD}
       MYSQL_DATABASE: \${MYSQL_DATABASE}
@@ -529,6 +531,7 @@ EOF
 
 # Create the mysql_data directory
 mkdir -p "${MYSQL_DATA}"
+mkdir -p "${LOG_DIR}"
 
 # Build the Docker image
 docker compose build
