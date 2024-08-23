@@ -339,7 +339,7 @@ RUN echo "mysql-server mysql-server/root_password password ${MYSQL_ROOT_PASSWORD
 EXPOSE ${WEB_PORT} ${MYSQL_PORT}
 
 # Set up persistent volumes
-VOLUME ["/var/www/html", "/etc/apache2", "/etc/mysql", "/etc/supervisor", "/etc/php/\${PHP_VERSION}/apache2"]
+VOLUME ["/var/www/html", "/etc/apache2", "/etc/mysql", "/etc/supervisor", "/etc/php/\${PHP_VERSION}/apache2", "/docker-entrypoint-initdb.d"]
 
 # Copy configuration files
 COPY ${CONFIG_DIR}/supervisord.conf /etc/supervisor/supervisord.conf
@@ -379,12 +379,33 @@ services:
       - ./${CONFIG_DIR}/my.cnf:/etc/mysql/my.cnf
       - ./${MYSQL_DATA}:/var/lib/mysql
       - ./${WEB_ROOT}:/var/www/html
+      - ./${CONFIG_DIR}/init.sql:/docker-entrypoint-initdb.d/init.sql
     environment:
       MYSQL_ROOT_PASSWORD: \${MYSQL_ROOT_PASSWORD}
       MYSQL_DATABASE: \${MYSQL_DATABASE}
       MYSQL_USER: \${MYSQL_USER}
       MYSQL_PASSWORD: \${MYSQL_PASSWORD}
 EOF
+}
+
+# Function to handle SQL file
+handle_sql_file() {
+    local sql_file=$1
+    if [ -z "$sql_file" ]; then
+        echo "No SQL file provided."
+        return 1
+    fi
+
+    if [ ! -f "$sql_file" ]; then
+        echo "SQL file not found: $sql_file"
+        return 1
+    fi
+
+    # Copy the SQL file to the configuration directory
+    cp "$sql_file" "${CONFIG_DIR}/init.sql"
+
+    # Update the Dockerfile to copy and execute the SQL file
+    sed -i '/ service mysql start/a COPY ${CONFIG_DIR}/init.sql /docker-entrypoint-initdb.d/init.sql' Dockerfile
 }
 
 # Interactive configuration for PHP version
@@ -446,7 +467,7 @@ done
 
 # Interactive configuration for timezone
 echo "Select timezone (default America/New_York):"
-select timezone in America/New_York America/Los_Angeles America/Chicago America/Denver America/Phoenix America/Anchorage America/Juneau America/Detroit America/Indiana/Indianapolis America/Indiana/Marengo America/Indiana/Knox America/Indiana/Vevay America/Indiana/Tell_City America/Indiana/Petersburg America/Indiana/Vincennes America/Indiana/Winamac America/Indiana/Marengo America/Kentucky/Monticello America/Kentucky/Louisville America/North_Dakota/Center America/North_Dakota/New_Salem America/North_Dakota/Beulah America/North_Dakota/Center America/North_Dakota/New_Salem America/North_Dakota/Beulah; do
+select timezone in America/New_York America/Los_Angeles America/Chicago America/Denver America/Phoenix America/Anchorage America/Juneau America/Detroit America/Indiana/Indianapolis America/Indiana/Marengo America/Indiana/Knox America/Indiana/Vevay America/Indiana/Tell_City America/Indiana/Petersburg America/Indiana/Vincennes America/Indiana/Winamac America/Kentucky/Monticello America/Kentucky/Louisville America/North_Dakota/Center America/North_Dakota/New_Salem America/North_Dakota/Beulah; do
     case $timezone in
         America/New_York|America/Los_Angeles|America/Chicago|America/Denver|America/Phoenix|America/Anchorage|America/Juneau|America/Detroit|America/Indiana/Indianapolis|America/Indiana/Marengo|America/Indiana/Knox|America/Indiana/Vevay|America/Indiana/Tell_City|America/Indiana/Petersburg|America/Indiana/Vincennes|America/Indiana/Winamac|America/Kentucky/Monticello|America/Kentucky/Louisville|America/North_Dakota/Center|America/North_Dakota/New_Salem|America/North_Dakota/Beulah)
             export TIMEZONE=$timezone
@@ -457,6 +478,11 @@ select timezone in America/New_York America/Los_Angeles America/Chicago America/
             ;;
     esac
 done
+
+# Handle SQL file if provided
+if [ -n "$1" ]; then
+    handle_sql_file "$1"
+fi
 
 # Write credentials to a file
 cat <<EOF > .env
