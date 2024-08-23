@@ -266,6 +266,16 @@ pid-file=/var/run/mysqld/mysqld.pid
 EOF
 }
 
+# Function to create MySQL configuration file
+create_user_my_cnf() {
+    cat <<EOF > ~/.my.cnf
+[client]
+host = localhost
+user = root
+password = claer
+EOF
+}
+
 # Function to create Dockerfile
 create_dockerfile() {
     cat <<EOF > Dockerfile
@@ -324,16 +334,14 @@ RUN apt-get install -y \\
 RUN a2enmod deflate expires rewrite
 
 # Set MySQL root password and create database and user
-RUN echo "mysql-server mysql-server/root_password password ${MYSQL_ROOT_PASSWORD}" | debconf-set-selections && \\
-    echo "mysql-server mysql-server/root_password_again password ${MYSQL_ROOT_PASSWORD}" | debconf-set-selections && \\
-    apt-get install -y mysql-server && \\
+RUN apt-get install -y mysql-server && \\
     service mysql start && \\
     mysql -u root -p${MYSQL_ROOT_PASSWORD} -e "CREATE DATABASE ${MYSQL_DATABASE};" && \\
     mysql -u root -p${MYSQL_ROOT_PASSWORD} -e "CREATE USER '${MYSQL_USER}'@'localhost' IDENTIFIED BY '${MYSQL_PASSWORD}';" && \\
     mysql -u root -p${MYSQL_ROOT_PASSWORD} -e "CREATE USER '${MYSQL_USER}'@'%' IDENTIFIED BY '${MYSQL_PASSWORD}';" && \\
     mysql -u root -p${MYSQL_ROOT_PASSWORD} -e "GRANT ALL PRIVILEGES ON ${MYSQL_DATABASE}.* TO '${MYSQL_USER}'@'localhost';" && \\
     mysql -u root -p${MYSQL_ROOT_PASSWORD} -e "GRANT ALL PRIVILEGES ON ${MYSQL_DATABASE}.* TO '${MYSQL_USER}'@'%';" && \\
-    mysql -u root -p${MYSQL_ROOT_PASSWORD} -e "FLUSH PRIVILEGES;"
+    mysql -u root -p${MYSQL_ROOT_PASSWORD} -e "FLUSH PRIVILEGES;";
 
 # Expose ports
 EXPOSE ${WEB_PORT} ${MYSQL_PORT}
@@ -379,7 +387,7 @@ services:
       - ./${CONFIG_DIR}/my.cnf:/etc/mysql/my.cnf
       - ./${MYSQL_DATA}:/var/lib/mysql
       - ./${WEB_ROOT}:/var/www/html
-      - ./${CONFIG_DIR}/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./${CONFIG_DIR}/mysql_create.sql:/etc/mysql/mysql_create.sql
     environment:
       MYSQL_ROOT_PASSWORD: \${MYSQL_ROOT_PASSWORD}
       MYSQL_DATABASE: \${MYSQL_DATABASE}
@@ -402,10 +410,10 @@ handle_sql_file() {
     fi
 
     # Copy the SQL file to the configuration directory
-    cp "$sql_file" "${CONFIG_DIR}/init.sql"
+    cp "$sql_file" "${CONFIG_DIR}/mysql_create.sql"
 
     # Update the Dockerfile to copy and execute the SQL file
-    sed -i '/ service mysql start/a COPY ${CONFIG_DIR}/init.sql /docker-entrypoint-initdb.d/init.sql' Dockerfile
+    mysql -u root -p${MYSQL_ROOT_PASSWORD} ${MYSQL_DATABASE} < "${CONFIG_DIR}/mysql_create.sql"
 }
 
 # Load values from .env file if it exists
@@ -498,6 +506,7 @@ EOF
 fi
 
 # Create configuration files
+create_user_my_cnf
 create_supervisor_conf
 create_apache_config_dir
 create_php_ini
