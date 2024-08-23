@@ -321,7 +321,7 @@ RUN apt-get install -y \\
     php-pear
 
 # Enable Apache modules
-RUN a2enmod access_compat actions alias auth_basic authn_core authn_file authz_core authz_host authz_user autoindex cgid deflate dir env expires fcgid filter headers include mime mpm_event negotiation proxy_ajp proxy_balancer proxy_fcgi proxy_http proxy reqtimeout rewrite setenvif slotmem_shm socache_shmcb
+RUN a2enmod deflate expires rewrite
 
 # Set MySQL root password and create database and user
 RUN echo "mysql-server mysql-server/root_password password ${MYSQL_ROOT_PASSWORD}" | debconf-set-selections && \\
