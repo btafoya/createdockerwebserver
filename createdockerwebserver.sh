@@ -42,7 +42,7 @@ TransferLog /dev/stdout
 
 # Expose minimal details in server header
 ServerTokens ProductOnly
-<VirtualHost *:${WEB_PORT}>
+<VirtualHost *:80>
     ServerAdmin webmaster@localhost
     DocumentRoot /var/www/html
 
@@ -264,7 +264,7 @@ datadir=/var/lib/mysql
 socket=/var/lib/mysql/mysql.sock
 user=mysql
 symbolic-links=0
-port=${MYSQL_PORT}
+port=3306
 bind-address=0.0.0.0
 
 [mysqld_safe]
@@ -336,6 +336,7 @@ RUN apt-get install -y \\
     php${PHP_VERSION}-iconv \\
     php${PHP_VERSION}-maxminddb \\
     php-pear \\
+    libapache2-mod-php${PHP_VERSION} \\
     # Ensure apache can bind to 80 as non-root
     libcap2-bin && \\
     setcap 'cap_net_bind_service=+ep' /usr/sbin/apache2 && \\
@@ -365,7 +366,7 @@ RUN apt-get install -y mysql-server && \\
     mysql -u root -p${MYSQL_ROOT_PASSWORD} -e "FLUSH PRIVILEGES;";
 
 # Expose ports
-EXPOSE ${WEB_PORT} ${MYSQL_PORT}
+EXPOSE 80 3306
 
 # Set up persistent volumes
 VOLUME ["/var/www/html", "/etc/apache2", "/etc/mysql", "/etc/supervisor", "/etc/php/\${PHP_VERSION}/apache2", "/docker-entrypoint-initdb.d"]
@@ -402,8 +403,8 @@ services:
         MYSQL_PORT: \${MYSQL_PORT}
         UBUNTU_VERSION: \${UBUNTU_VERSION}
     ports:
-      - "\${WEB_PORT}:${WEB_PORT}"
-      - "\${MYSQL_PORT}:${MYSQL_PORT}"
+      - "${WEB_PORT}:80"
+      - "${MYSQL_PORT}:3306"
     volumes:
       - ./${CONFIG_DIR}/apache2/000-default.conf:/etc/apache2/sites-available/000-default.conf
       - ./${CONFIG_DIR}/supervisord.conf:/etc/supervisor/supervisord.conf
@@ -414,10 +415,10 @@ services:
       - ./${CONFIG_DIR}/mysql_create.sql:/etc/mysql/mysql_create.sql
       - ./${LOG_DIR}:/var/log
     environment:
-      MYSQL_ROOT_PASSWORD: \${MYSQL_ROOT_PASSWORD}
-      MYSQL_DATABASE: \${MYSQL_DATABASE}
-      MYSQL_USER: \${MYSQL_USER}
-      MYSQL_PASSWORD: \${MYSQL_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
 EOF
 }
 
