@@ -27,8 +27,8 @@ nodaemon=true
 command=php /var/www/html/${WEB_ROOT}/worker.php
 autostart=true
 autorestart=true
-stderr_logfile=/var/log/supervisor/gearman-worker.err.log
-stdout_logfile=/var/log/supervisor/gearman-worker.out.log
+stderr_logfile=/dev/stderr
+stdout_logfile=/dev/stdout
 EOF
 }
 
@@ -36,6 +36,12 @@ EOF
 create_apache_config_dir() {
     mkdir -p "${CONFIG_DIR}/apache2"
     cat <<EOF > ${CONFIG_DIR}/apache2/000-default.conf
+ErrorLog    /dev/stderr
+CustomLog   /dev/stdout combined
+TransferLog /dev/stdout
+
+# Expose minimal details in server header
+ServerTokens ProductOnly
 <VirtualHost *:${WEB_PORT}>
     ServerAdmin webmaster@localhost
     DocumentRoot /var/www/html
@@ -46,8 +52,8 @@ create_apache_config_dir() {
         Require all granted
     </Directory>
 
-    ErrorLog /var/log/apache2/error.log
-    CustomLog ${LOG_DIR}/apache2/access.log combined
+    ErrorLog /dev/stderr
+    CustomLog /dev/stdout combined
 </VirtualHost>
 EOF
 }
@@ -76,7 +82,7 @@ error_reporting = E_ALL & ~E_DEPRECATED & ~E_STRICT
 display_errors = On
 display_startup_errors = Off
 log_errors = On
-error_log = /var/log/php/php.log
+error_log = /dev/stdout
 log_errors_max_len = 1024
 ignore_repeated_errors = Off
 ignore_repeated_source = Off
@@ -223,7 +229,7 @@ opcache.blacklist_filename=
 opcache.max_file_size=0
 opcache.consistency_checks=0
 opcache.force_restart_timeout=180
-opcache.error_log=/var/log/opcache/opcache.log
+opcache.error_log=/dev/stdout
 opcache.log_verbosity_level=1
 opcache.preferred_memory_model=
 opcache.protect_memory=0
@@ -262,7 +268,7 @@ port=${MYSQL_PORT}
 bind-address=0.0.0.0
 
 [mysqld_safe]
-log-error=/var/log/mysql/mysqld.log
+log-error=/dev/stderr
 pid-file=/var/run/mysqld/mysqld.pid
 EOF
 }
@@ -329,8 +335,22 @@ RUN apt-get install -y \\
     php${PHP_VERSION}-opcache \\
     php${PHP_VERSION}-iconv \\
     php${PHP_VERSION}-maxminddb \\
-    php-pear
-
+    php-pear \\
+    # Ensure apache can bind to 80 as non-root
+    libcap2-bin && \\
+    setcap 'cap_net_bind_service=+ep' /usr/sbin/apache2 && \\
+    # dpkg --purge libcap2-bin && \\
+    apt-get -y autoremove && \\
+    # As apache is never run as root, change dir ownership
+    a2disconf other-vhosts-access-log && \\
+    # chown -Rh www-data:www-data /var/run/apache2 && \\
+    # Install ImageMagick CLI tools
+    # apt-get -y install --no-install-recommends imagemagick && \\
+    # Clean up apt setup files
+    apt-get clean && \\
+    rm -rf /var/lib/apt/lists/* && \\
+    # Setup apache
+    a2enmod rewrite headers expires ext_filter deflate
 # Enable Apache modules
 RUN a2enmod deflate expires rewrite
 
@@ -356,8 +376,11 @@ COPY ${CONFIG_DIR}/apache2/000-default.conf /etc/apache2/sites-available/000-def
 COPY ${CONFIG_DIR}/php.ini /etc/php/\${PHP_VERSION}/apache2/php.ini
 COPY ${CONFIG_DIR}/my.cnf /etc/mysql/my.cnf
 
-# Start services
-CMD ["/usr/bin/supervisord"]
+RUN mkdir -p /var/run/apache2 && chown -R www-data:www-data /var/run/apache2
+
+USER www-data
+
+ENTRYPOINT ["apache2ctl", "-D", "FOREGROUND"]
 EOF
 }
 
